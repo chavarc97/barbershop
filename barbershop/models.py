@@ -59,6 +59,8 @@ class Appointment(models.Model):
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     active = models.BooleanField(default=True)
+    service = models.ForeignKey(Service, on_delete=models.PROTECT, related_name="appointments")
+
 
     def __str__(self):
         return f"Appt #{self.id} {self.status} - {self.appointment_datetime}"
