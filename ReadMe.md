@@ -70,19 +70,24 @@ A full-stack barbershop booking platform where:
 
 ```mermaid
 erDiagram
-    %% Users: clients, barbers, admins
-    User {
+    DjangoUser {
         int id PK
-        string name
-        string email "unique"
-        string role "CLIENT | BARBER | ADMIN"
+        string username "unique"
+        string email
+        string first_name
+        string last_name
+    }
+
+    UserProfile {
+        int id PK
+        int user_id FK
+        string role "client | barber | admin"
         string phone_number
         string google_id
         datetime created_at
         bool active
     }
 
-    %% Services offered by the barbershop
     Service {
         int id PK
         string name
@@ -92,49 +97,47 @@ erDiagram
         bool active
     }
 
-    %% Appointments (bookings)
     Appointment {
         int id PK
+        int client_id FK
+        int barber_id FK
         datetime appointment_datetime
         int duration_minutes
-        string status "BOOKED | COMPLETED | CANCELED"
+        string status "booked | completed | canceled"
         text notes
         datetime created_at
         bool active
+        int service_id FK
     }
 
-    %% Barber weekly schedule (availability)
     BarberSchedule {
         int id PK
         int barber_id FK
-        int day_of_week
+        int day_of_week "1..7 (Mon=1, Sun=7)"
         time start_time
         time end_time
         bool active
     }
 
-    %% Ratings and reviews for completed appointments
     Rating {
         int id PK
         int appointment_id FK
         int user_id FK
-        int score
+        int score "1..5"
         text comment
         datetime created_at
     }
 
-    %% Payments / transactions for appointments (optional)
     Payment {
         int id PK
         int appointment_id FK
         decimal amount
         string currency
-        string status "PENDING | COMPLETED | REFUNDED"
+        string status "pending | completed | refunded"
         datetime paid_at
         string provider
     }
 
-    %% Optional: External calendar event mapping
     CalendarEvent {
         int id PK
         int appointment_id FK
@@ -143,34 +146,21 @@ erDiagram
         datetime synced_at
     }
 
-    %% Relationships
-    %% User (client) books many Appointments
-    User ||--o{ Appointment : "books"
+    %% Relations
+    DjangoUser ||--|| UserProfile : "has one"
+    DjangoUser ||--o{ Appointment : "books (as client)"
+    DjangoUser ||--o{ Appointment : "assigned (as barber)"
+    DjangoUser ||--o{ BarberSchedule : "has schedule"
 
-    %% A barber (User with role=BARBER) can be assigned to many Appointments
-    User ||--o{ BarberSchedule : "has schedule"
-    User ||--o{ Appointment : "assigned to"
+    Service ||--o{ Appointment : "selected service"
 
-    %% Service included in many Appointments (one Appointment has one Service)
-    Service ||--o{ Appointment : "included in"
-
-    %% Appointment may reference a BarberSchedule (optional)
-    Appointment }o--|| BarberSchedule : "fits into"
-
-    %% Ratings belong to an Appointment and to a User
     Appointment ||--o{ Rating : "has"
-    User ||--o{ Rating : "writes"
+    DjangoUser ||--o{ Rating : "writes"
 
-    %% Payments are linked to Appointments
     Appointment ||--o{ Payment : "billed by"
-
-    %% CalendarEvent ties an Appointment to an external calendar
     Appointment ||--o{ CalendarEvent : "syncs to"
 
-  
-    %% Notes:
-    %% - Users table stores both clients and barbers; barber-specific fields can be added in a profile table if needed.
-    %% - BarberSchedule uses day_of_week (0-6) and start/end times to define availability.
+
 ```
 
 ## MAIN FEATURES / ENDPOINTS (REST API)
