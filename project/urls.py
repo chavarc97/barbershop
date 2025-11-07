@@ -19,7 +19,7 @@ from django.urls import path, include, re_path
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-
+from barbershop import views
 # Swagger schema view
 schema_view = get_schema_view(
     openapi.Info(
@@ -58,7 +58,13 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('barbershop.urls')),
-    
+    # auth templates 
+    path("register/", views.register, name="register"),
+    path("login/", views.login_view, name="login"),
+    path("logout/", views.logout_view, name="logout"),
+    path("profile/", views.profile, name="profile"),
+    path("accounts/", include("allauth.urls")),
+
     # DRF browsable API auth
     path('api-auth/', include('rest_framework.urls')),
     
