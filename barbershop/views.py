@@ -6,11 +6,6 @@ from django.contrib.auth.models import User
 from django.db.models import Q, Avg, Count, Sum
 from django.utils import timezone
 from datetime import datetime, timedelta, time
-from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from .forms import RegistrationForm
 from .models import (
     UserProfile, Service, BarberSchedule,
     Appointment, Rating, Payment, CalendarEvent
@@ -22,51 +17,6 @@ from .serializers import (
     AppointmentCancelSerializer, UserSerializer
 )
 from .permissions import IsBarberOrAdmin, IsClientOrAdmin, IsOwnerOrAdmin
-
-def register(request):
-    """
-    Sign up view .
-    """
-    if request.method == "POST":
-        form = RegistrationForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.set_password(form.cleaned_data["password"])
-            user.save()
-            messages.success(request, "Account created successfully. You can now sign in.")
-            return redirect("login")
-    else:
-        form = RegistrationForm()
-    return render(request, "users/register.html", {"form": form})
-
-def login_view(request):
-    """
-    Sign in view (username/password) + Google button in template.
-    """
-    if request.method == "POST":
-        username = request.POST.get("username", "")
-        password = request.POST.get("password", "")
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
-            login(request, user)
-            return redirect("profile")
-        messages.error(request, "Invalid credentials")
-    return render(request, "users/login.html")
-
-@login_required
-def profile(request):
-    """
-    Simple protected page.
-    """
-    return render(request, "users/profile.html")
-
-def logout_view(request):
-    """
-    Sign out and redirect to login.
-    """
-    logout(request)
-    return redirect("login")
-
 
 
 def index(request):
@@ -956,8 +906,3 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
             CalendarEventSerializer(calendar_event).data,
             status=status.HTTP_201_CREATED
         )
-    
-
-
-
-
