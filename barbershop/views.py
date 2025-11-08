@@ -6,6 +6,11 @@ from django.contrib.auth.models import User
 from django.db.models import Q, Avg, Count, Sum
 from django.utils import timezone
 from datetime import datetime, timedelta, time
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
+from google.auth.transport import requests
+from google.oauth2 import id_token
 from .models import (
     UserProfile, Service, BarberSchedule,
     Appointment, Rating, Payment, CalendarEvent
@@ -906,3 +911,88 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
             CalendarEventSerializer(calendar_event).data,
             status=status.HTTP_201_CREATED
         )
+    
+
+class LoginAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+
+        if not username or not password:
+            return Response({'error': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(username=username, password=password)
+        if user is None:
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Generar tkens
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': getattr(user.profile, 'role', None)
+            }
+        })
+    
+
+class GoogleLoginAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token = request.data.get('id_token')
+
+        if not token:
+            return Response({'error': 'id_token is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Verifica el token con Google
+            idinfo = id_token.verify_oauth2_token(token, requests.Request())
+
+            # info del usuario
+            google_id = idinfo['sub']
+            email = idinfo.get('email')
+            first_name = idinfo.get('given_name', '')
+            last_name = idinfo.get('family_name', '')
+
+        except ValueError:
+            return Response({'error': 'Invalid Google token'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Buscar usuario existente o crearlo
+        user, created = User.objects.get_or_create(
+            email=email,
+            defaults={
+                'username': email.split('@')[0],
+                'first_name': first_name,
+                'last_name': last_name,
+            }
+        )
+
+        # Crear o actualizar  perfil si no exist
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        if not profile.google_id:
+            profile.google_id = google_id
+            profile.save()
+
+        # Generar JWT 
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': profile.role,
+            },
+            'created': created
+        })  

@@ -7,7 +7,9 @@ from .views import (
     AppointmentViewSet, 
     RatingViewSet, 
     PaymentViewSet, 
-    CalendarEventViewSet
+    CalendarEventViewSet,
+    LoginAPIView,
+    GoogleLoginAPIView
 )
 
 
@@ -28,4 +30,8 @@ router.register(r'calendar-events', CalendarEventViewSet, basename='calendareven
 # The API URLs are now determined automatically by the router
 urlpatterns = [
     path('', include(router.urls)),
+    path('login/', LoginAPIView.as_view(), name='login'),
+    path('google/', GoogleLoginAPIView.as_view(), name='google-login'),
+
+
 ]
