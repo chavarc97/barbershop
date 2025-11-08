@@ -996,3 +996,50 @@ class GoogleLoginAPIView(APIView):
             },
             'created': created
         })  
+    
+class RegisterAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get('username')
+        email = request.data.get('email')
+        password = request.data.get('password')
+        first_name = request.data.get('first_name', '')
+        last_name = request.data.get('last_name', '')
+
+        if not username or not password or not email:
+            return Response(
+                {"error": "username, email and password are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if User.objects.filter(username=username).exists():
+            return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "Email already registered"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create user
+        user = User(username=username, email=email, first_name=first_name, last_name=last_name)
+        user.set_password(password)
+        user.save()
+
+        # Create profile
+        profile = UserProfile.objects.create(user=user, role=UserProfile.Roles.CLIENT)
+
+        # token JWT
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": profile.role,
+            },
+            "message": "User registered successfully"
+        }, status=status.HTTP_201_CREATED)

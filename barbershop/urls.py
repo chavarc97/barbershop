@@ -9,7 +9,8 @@ from .views import (
     PaymentViewSet, 
     CalendarEventViewSet,
     LoginAPIView,
-    GoogleLoginAPIView
+    GoogleLoginAPIView,
+    RegisterAPIView
 )
 
 
@@ -32,6 +33,7 @@ urlpatterns = [
     path('', include(router.urls)),
     path('login/', LoginAPIView.as_view(), name='login'),
     path('google/', GoogleLoginAPIView.as_view(), name='google-login'),
+    path('register/', RegisterAPIView.as_view(), name='register'),
 
 
 ]
