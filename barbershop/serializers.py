@@ -83,11 +83,13 @@ class AppointmentListSerializer(serializers.ModelSerializer):
     """Simplified serializer for listing appointments"""
     client_name = serializers.CharField(source='client.username', read_only=True)
     barber_name = serializers.CharField(source='barber.username', read_only=True)
-    
+    service_name = serializers.CharField(source='service.name', read_only=True)
+
     class Meta:
         model = Appointment
         fields = [
             'id', 'client', 'client_name', 'barber', 'barber_name',
+            'service', 'service_name',
             'appointment_datetime', 'duration_minutes', 'status',
             'created_at'
         ]
@@ -98,6 +100,8 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
     """Detailed appointment serializer with all relations"""
     client = UserSerializer(read_only=True)
     barber = UserSerializer(read_only=True)
+    service = ServiceSerializer(read_only=True)
+    service_id = serializers.PrimaryKeyRelatedField(queryset=Service.objects.filter(active=True), source='service', write_only=True)
     client_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), 
         source='client', 
@@ -113,6 +117,7 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         model = Appointment
         fields = [
             'id', 'client', 'client_id', 'barber', 'barber_id',
+            'service', 'service_id',
             'appointment_datetime', 'duration_minutes', 'status',
             'notes', 'created_at', 'active'
         ]

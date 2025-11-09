@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     const response = await api.post<{ token: string; user: UserProfile }>(
-      '/auth/login/',
+      '/profiles/login/',
       { username, password },
       false
     );
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (username: string, email: string, password: string, phone: string) => {
     const response = await api.post<{ token: string; user: UserProfile }>(
-      '/auth/signup/',
+      '/profiles/signup/',
       { username, email, password, phone_number: phone },
       false
     );
