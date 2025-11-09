@@ -11,6 +11,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from google.auth.transport import requests
 from google.oauth2 import id_token
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from .models import (
     UserProfile, Service, BarberSchedule,
     Appointment, Rating, Payment, CalendarEvent
@@ -835,7 +838,7 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
     - GET /calendar-events/{id}/ - Get event
     - PUT /calendar-events/{id}/ - Update event
     - DELETE /calendar-events/{id}/ - Delete event
-    - POST /calendar-events/sync/ - Sync appointment to calendar
+    - POST /calendar-events/sync/ - Sync appointment to Google Calendar
     """
     queryset = CalendarEvent.objects.select_related('appointment').all()
     serializer_class = CalendarEventSerializer
@@ -854,28 +857,27 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def sync(self, request):
         """
-        Sync an appointment to external calendar
+        Sync an appointment to Google Calendar
         POST /calendar-events/sync/
-        Body: {appointment_id, provider}
+        Body: {appointment_id, access_token}
         """
         appointment_id = request.data.get('appointment_id')
         provider = request.data.get('provider', 'google_calendar')
-        
-        if not appointment_id:
+        access_token = request.data.get('access_token')
+
+        if not appointment_id or not access_token:
             return Response(
-                {"error": "appointment_id is required"},
+                {"error": "appointment_id and access_token are required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Find appointment
         try:
-            appointment = Appointment.objects.get(id=appointment_id)
+            appointment = Appointment.objects.select_related('client', 'barber', 'service').get(id=appointment_id)
         except Appointment.DoesNotExist:
-            return Response(
-                {"error": "Appointment not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({"error": "Appointment not found"}, status=status.HTTP_404_NOT_FOUND)
         
-        # Check if user is the barber or admin
+        # Check permissions
         user = request.user
         is_admin = hasattr(user, 'profile') and user.profile.role == UserProfile.Roles.ADMIN
         is_barber = appointment.barber == user
@@ -885,35 +887,71 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
                 {"error": "Only the assigned barber or admin can sync appointments"},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
-        # Check if already synced
-        existing_event = CalendarEvent.objects.filter(
-            appointment=appointment,
-            provider=provider
-        ).first()
-        
+
+        # Avoid duplicates
+        existing_event = CalendarEvent.objects.filter(appointment=appointment, provider=provider).first()
         if existing_event:
             return Response(
                 {"message": "Appointment already synced", "event": CalendarEventSerializer(existing_event).data},
                 status=status.HTTP_200_OK
             )
         
-        # TODO: Implement actual calendar API integration here
-        # For now, create a placeholder event
+        # Create temporary credentials with the access_token
+        try:
+            creds = Credentials(token=access_token)
+            service = build('calendar', 'v3', credentials=creds)
+        except Exception as e:
+            return Response({"error": f"Google Calendar connection failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Build event body
+        start_time = appointment.appointment_datetime
+        end_time = appointment.appointment_datetime + timedelta(minutes=appointment.duration_minutes)
+        event_body = {
+            'summary': f'Cita con {appointment.client.username}',
+            'description': (
+                f'Servicio: {appointment.service.name}\n'
+                f'Cliente: {appointment.client.username}\n'
+                f'Notas: {appointment.notes or "Sin notas"}'
+            ),
+            'start': {'dateTime': start_time.isoformat(), 'timeZone': 'America/Mexico_City'},
+            'end': {'dateTime': end_time.isoformat(), 'timeZone': 'America/Mexico_City'},
+            'reminders': {
+                'useDefault': False,
+                'overrides': [{'method': 'popup', 'minutes': 30}]
+            }
+        }
+
+        try:
+            event = service.events().insert(calendarId='primary', body=event_body).execute()
+            external_event_id = event['id']
+        except Exception as e:
+            return Response({"error": f"Failed to create Google Calendar event: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Save event
         calendar_event = CalendarEvent.objects.create(
             appointment=appointment,
-            external_event_id=f"temp_{appointment_id}_{timezone.now().timestamp()}",
+            external_event_id=external_event_id,
             provider=provider,
             synced_at=timezone.now()
         )
-        
+
         return Response(
-            CalendarEventSerializer(calendar_event).data,
+            {
+                "message": "Appointment synced to Google Calendar successfully",
+                "event": CalendarEventSerializer(calendar_event).data
+            },
             status=status.HTTP_201_CREATED
         )
-    
 
 class LoginAPIView(APIView):
+    """
+    Handle traditional username/password login.
+
+    This endpoint authenticates a user using Django's built-in authentication system.
+    If the credentials are valid, it generates a new pair of JWT tokens 
+    (access & refresh) that allow the user to make authenticated requests.
+
+    """
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -944,6 +982,14 @@ class LoginAPIView(APIView):
     
 
 class GoogleLoginAPIView(APIView):
+    """
+    Handle Google OAuth2 login or registration.
+
+    This endpoint verifies the provided Google ID token, retrieves the user's
+    profile information from Google, and either logs in an existing user or
+    automatically creates a new account if the user does not exist.
+
+    """    
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -953,10 +999,10 @@ class GoogleLoginAPIView(APIView):
             return Response({'error': 'id_token is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Verifica el token con Google
+            # Verfy the token with Google
             idinfo = id_token.verify_oauth2_token(token, requests.Request())
 
-            # info del usuario
+            # user info
             google_id = idinfo['sub']
             email = idinfo.get('email')
             first_name = idinfo.get('given_name', '')
@@ -965,7 +1011,7 @@ class GoogleLoginAPIView(APIView):
         except ValueError:
             return Response({'error': 'Invalid Google token'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Buscar usuario existente o crearlo
+        # Find existing user or create one
         user, created = User.objects.get_or_create(
             email=email,
             defaults={
@@ -975,13 +1021,13 @@ class GoogleLoginAPIView(APIView):
             }
         )
 
-        # Crear o actualizar  perfil si no exist
+        # Create or update profile if it does not exist
         profile, _ = UserProfile.objects.get_or_create(user=user)
         if not profile.google_id:
             profile.google_id = google_id
             profile.save()
 
-        # Generar JWT 
+        # Generate JWT 
         refresh = RefreshToken.for_user(user)
         return Response({
             'access': str(refresh.access_token),
@@ -998,6 +1044,15 @@ class GoogleLoginAPIView(APIView):
         })  
     
 class RegisterAPIView(APIView):
+    """
+    Handle user registration requests.
+
+    This endpoint allows new users to sign up by providing a username, email, and password.
+    It automatically creates both a Django User object and a related UserProfile 
+    with the default role 'client', then returns JWT access and refresh tokens.
+
+    """
+    
     permission_classes = [AllowAny]
 
     def post(self, request):
