@@ -182,7 +182,6 @@ class ServiceViewSet(viewsets.ModelViewSet):
         GET /services/popular/
         """
         # Count appointments for each service
-        # Note: You'll need to add a service field to Appointment model
         services = self.get_queryset().annotate(
             booking_count=Count('appointment')
         ).order_by('-booking_count')[:5]
@@ -947,26 +946,29 @@ class LoginAPIView(APIView):
     """
     Handle traditional username/password login.
 
-    This endpoint authenticates a user using Django's built-in authentication system.
-    If the credentials are valid, it generates a new pair of JWT tokens 
-    (access & refresh) that allow the user to make authenticated requests.
+    Authenticates users using Django's authentication system.
+    If valid, generates JWT tokens and returns user details.
 
     """
+
     permission_classes = [AllowAny]
 
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
 
+        # Validate fields
         if not username or not password:
             return Response({'error': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Authenticate user
         user = authenticate(username=username, password=password)
         if user is None:
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Generar tkens
+        # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
+
         return Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
@@ -979,30 +981,36 @@ class LoginAPIView(APIView):
                 'role': getattr(user.profile, 'role', None)
             }
         })
-    
+
 
 class GoogleLoginAPIView(APIView):
     """
     Handle Google OAuth2 login or registration.
 
-    This endpoint verifies the provided Google ID token, retrieves the user's
-    profile information from Google, and either logs in an existing user or
-    automatically creates a new account if the user does not exist.
+    This endpoint verifies a Google ID token, retrieves the user info, 
+    and either logs in an existing user or creates a new one.
 
-    """    
+    It also allows specifying a role (client or barber) during registration.
+
+    """
+
     permission_classes = [AllowAny]
 
     def post(self, request):
         token = request.data.get('id_token')
+        role = request.data.get('role', UserProfile.Roles.CLIENT)  
 
         if not token:
             return Response({'error': 'id_token is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if role not in [UserProfile.Roles.CLIENT, UserProfile.Roles.BARBER]:
+            return Response({'error': 'Invalid role'}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            # Verfy the token with Google
+            # Verify token with Google servers
             idinfo = id_token.verify_oauth2_token(token, requests.Request())
 
-            # user info
+            # Extract user info
             google_id = idinfo['sub']
             email = idinfo.get('email')
             first_name = idinfo.get('given_name', '')
@@ -1011,7 +1019,7 @@ class GoogleLoginAPIView(APIView):
         except ValueError:
             return Response({'error': 'Invalid Google token'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Find existing user or create one
+        # Find or create user by email
         user, created = User.objects.get_or_create(
             email=email,
             defaults={
@@ -1021,14 +1029,23 @@ class GoogleLoginAPIView(APIView):
             }
         )
 
-        # Create or update profile if it does not exist
+        # Ensure profile exists
         profile, _ = UserProfile.objects.get_or_create(user=user)
-        if not profile.google_id:
-            profile.google_id = google_id
-            profile.save()
 
-        # Generate JWT 
+        # Link Google ID and assign role if newly created
+        if created:
+            profile.google_id = google_id
+            profile.role = role
+            profile.save()
+        else:
+            # If user already existed but had no google_id link it
+            if not profile.google_id:
+                profile.google_id = google_id
+                profile.save()
+
+        # Generate JWT
         refresh = RefreshToken.for_user(user)
+
         return Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
@@ -1041,18 +1058,21 @@ class GoogleLoginAPIView(APIView):
                 'role': profile.role,
             },
             'created': created
-        })  
+        })
     
+
 class RegisterAPIView(APIView):
     """
     Handle user registration requests.
 
-    This endpoint allows new users to sign up by providing a username, email, and password.
-    It automatically creates both a Django User object and a related UserProfile 
-    with the default role 'client', then returns JWT access and refresh tokens.
+    This endpoint allows new users to register using username, email, and password.
+    It automatically creates both a Django User and a related UserProfile with a role.
+
+    If no role is provided, the default is 'client'.
+    If role='barber', the user will be registered as a barber.
 
     """
-    
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -1061,28 +1081,34 @@ class RegisterAPIView(APIView):
         password = request.data.get('password')
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
+        role = request.data.get('role', UserProfile.Roles.CLIENT)  # 👈 NEW
 
-        if not username or not password or not email:
+        # Validate required fields
+        if not username or not email or not password:
             return Response(
                 {"error": "username, email and password are required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Validate role
+        if role not in [UserProfile.Roles.CLIENT, UserProfile.Roles.BARBER]:
+            return Response({"error": "Invalid role"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check duplicates
         if User.objects.filter(username=username).exists():
             return Response({"error": "Username already exists"}, status=status.HTTP_400_BAD_REQUEST)
-
         if User.objects.filter(email=email).exists():
             return Response({"error": "Email already registered"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create user
+        # Create Django user
         user = User(username=username, email=email, first_name=first_name, last_name=last_name)
         user.set_password(password)
         user.save()
 
-        # Create profile
-        profile = UserProfile.objects.create(user=user, role=UserProfile.Roles.CLIENT)
+        # Create related profile with selected role
+        profile = UserProfile.objects.create(user=user, role=role)
 
-        # token JWT
+        # Generae JWT tokens
         refresh = RefreshToken.for_user(user)
 
         return Response({
@@ -1096,5 +1122,5 @@ class RegisterAPIView(APIView):
                 "last_name": user.last_name,
                 "role": profile.role,
             },
-            "message": "User registered successfully"
+            "message": f"User registered successfully as {role}"
         }, status=status.HTTP_201_CREATED)
