@@ -14,8 +14,9 @@ export default function Barbers() {
 
   const fetchBarbers = async () => {
     try {
-      const data = await api.get<UserProfile[]>('/profiles/barbers/');
+      const data = await api.get<UserProfile[]>('profiles/barbers/');
       setBarbers(data);
+      console.log(data);
     } catch (err) {
       setError('Failed to load barbers');
       console.error(err);
@@ -57,7 +58,7 @@ export default function Barbers() {
             key={barber.id}
             className="bg-white rounded-xl shadow-md hover:shadow-xl transition overflow-hidden"
           >
-            <div className="bg-line-to-br from-slate-700 to-slate-800 p-6 text-white">
+            <div className="bg-linear-to-br from-slate-700 to-slate-800 p-6 text-white">
               <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <User className="w-10 h-10" />
               </div>
