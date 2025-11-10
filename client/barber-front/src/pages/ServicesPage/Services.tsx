@@ -28,6 +28,7 @@ export default function Services() {
 
   const handleBookService = (service: Service) => {
     setSelectedService(service);
+    console.log(selectedService);
     window.location.href = `/book?service=${service.id}`;
   };
 
