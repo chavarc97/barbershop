@@ -1,4 +1,3 @@
-# barbershop/signals.py
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.mail import send_mail
@@ -16,7 +15,7 @@ def notify_barber_new_appointment(sender, instance, created, **kwargs):
         service_name = instance.service.name
         time = instance.appointment_datetime.strftime("%d/%m/%Y %H:%M")
 
-        subject = "💈 New Appointment Scheduled"
+        subject = "New Appointment Scheduled"
         message = (
             f"Hello {instance.barber.username},\n\n"
             f"You have a new appointment:\n\n"
