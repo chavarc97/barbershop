@@ -16,6 +16,8 @@ export default function Login() {
 
     try {
       await login(username, password);
+      // Redirect to Home Page
+      window.location.href = '/';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

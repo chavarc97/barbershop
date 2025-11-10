@@ -31,9 +31,9 @@ router.register(r'calendar-events', CalendarEventViewSet, basename='calendareven
 # The API URLs are now determined automatically by the router
 urlpatterns = [
     path('', include(router.urls)),
-    path('login/', LoginAPIView.as_view(), name='login'),
+    path('auth/login/', LoginAPIView.as_view(), name='login'),
     path('google/', GoogleLoginAPIView.as_view(), name='google-login'),
-    path('register/', RegisterAPIView.as_view(), name='register'),
+    path('auth/register/', RegisterAPIView.as_view(), name='register'),
 
 
 ]

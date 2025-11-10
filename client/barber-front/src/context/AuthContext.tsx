@@ -23,47 +23,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkAuth = async () => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('access_token');
     if (!token) {
       setLoading(false);
       return;
     }
 
     try {
-      const profile = await api.get<UserProfile>('/profiles/me/');
+      const profile = await api.get<UserProfile>('profiles/me/');
       setUser(profile);
     } catch (error) {
       console.error('Auth check failed:', error);
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
     } finally {
       setLoading(false);
     }
   };
 
   const login = async (username: string, password: string) => {
-    const response = await api.post<{ token: string; user: UserProfile }>(
-      '/profiles/login/',
+    const response = await api.post<{ access: string; refresh: string; user: UserProfile }>(
+      'auth/login/',
       { username, password },
       false
     );
 
-    localStorage.setItem('auth_token', response.token);
+    localStorage.setItem('access_token', response.access);
+    localStorage.setItem('refresh_token', response.refresh);
     setUser(response.user);
   };
 
   const signup = async (username: string, email: string, password: string, phone: string) => {
-    const response = await api.post<{ token: string; user: UserProfile }>(
-      '/profiles/signup/',
+    const response = await api.post<{ access: string; refresh: string; user: UserProfile }>(
+      'auth/register/',
       { username, email, password, phone_number: phone },
       false
     );
 
-    localStorage.setItem('auth_token', response.token);
+    localStorage.setItem('access_token', response.access);
+    localStorage.setItem('refresh_token', response.refresh);
     setUser(response.user);
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     setUser(null);
   };
 

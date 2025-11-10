@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8500/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8500/api/';
 
 interface RequestOptions extends RequestInit {
   requiresAuth?: boolean;
@@ -12,7 +12,7 @@ class ApiClient {
   }
 
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('access_token');
     return {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),

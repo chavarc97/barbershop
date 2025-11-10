@@ -18,6 +18,8 @@ export default function SignUp() {
 
     try {
       await signup(username, email, password, phone);
+      // Redirect to login page
+      window.location.href = '/login';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed');
     } finally {

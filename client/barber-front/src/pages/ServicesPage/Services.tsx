@@ -15,7 +15,8 @@ export default function Services() {
 
   const fetchServices = async () => {
     try {
-      const data = await api.get<Service[]>('/services/', false);
+      const data = await api.get<Service[]>('services/', false);
+      console.log(data);
       setServices(data);
     } catch (err) {
       setError('Failed to load services');
@@ -59,7 +60,7 @@ export default function Services() {
             key={service.id}
             className="bg-white rounded-xl shadow-md hover:shadow-xl transition overflow-hidden"
           >
-            <div className="bg-line-to-br from-blue-500 to-blue-600 p-6 text-white">
+            <div className="bg-linear-to-br from-blue-500 to-blue-600 p-6 text-white">
               <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center mb-4">
                 <Scissors className="w-6 h-6" />
               </div>
