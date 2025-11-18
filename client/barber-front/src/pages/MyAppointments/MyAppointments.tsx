@@ -4,6 +4,7 @@ import type { Appointment } from '../../types';
 import { Calendar, Clock, User, XCircle, Edit, Star } from 'lucide-react';
 import RatingModal from '../../components/RatingModal/RatingModal';
 import RescheduleModal from '../../components/RescheduleModal/RescheduleModal';
+import { useAuth } from '../../context/AuthContext';
 
 export default function MyAppointments() {
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
@@ -13,11 +14,27 @@ export default function MyAppointments() {
   const [selectedForRating, setSelectedForRating] = useState<Appointment | null>(null);
   const [selectedForReschedule, setSelectedForReschedule] = useState<Appointment | null>(null);
   const [error, setError] = useState('');
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    fetchAppointments();
-  }, []);
-
+    // Wait for auth check to complete. Only fetch appointments when authenticated.
+    if (isAuthenticated) {
+      setLoading(false);
+      setUpcomingAppointments([]);
+      setPastAppointments([]);
+      fetchAppointments();
+      console.log(upcomingAppointments);
+      console.log(pastAppointments);
+      return;
+    } else {
+      setLoading(false);
+      // Redirect to login page
+      window.location.href = '/login';
+    }
+    
+    
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
   const fetchAppointments = async () => {
     setLoading(true);
     try {
@@ -28,6 +45,7 @@ export default function MyAppointments() {
 
       setUpcomingAppointments(upcoming);
       setPastAppointments(history);
+      
     } catch (err) {
       setError('Failed to load appointments');
       console.error(err);

@@ -2,16 +2,24 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { UserProfile } from '../../types';
 import { Star, User, Award } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Barbers() {
   const [barbers, setBarbers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    fetchBarbers();
-  }, []);
-
+    if (isAuthenticated) {
+      fetchBarbers();
+    }
+    else {
+      setLoading(false);
+      // Redirect to login page
+      window.location.href = '/login';
+    }
+  }, [isAuthenticated]);
   const fetchBarbers = async () => {
     try {
       const data = await api.get<UserProfile[]>('profiles/barbers/');

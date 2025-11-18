@@ -29,7 +29,11 @@ class ApiClient {
       ? this.getAuthHeaders()
       : { 'Content-Type': 'application/json' };
 
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
+    // Normalize endpoint to avoid double slashes
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+    const url = `${this.baseURL}${normalizedEndpoint}`;
+
+    const response = await fetch(url, {
       ...fetchOptions,
       headers: {
         ...headers,

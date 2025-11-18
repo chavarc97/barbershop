@@ -2,17 +2,24 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import type { Service } from '../../types';
 import { Clock, DollarSign, Scissors } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Services() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    fetchServices();
-  }, []);
-
+    if (isAuthenticated) {
+      fetchServices();
+    } else {
+      setLoading(false);
+      // Redirect to login page
+      window.location.href = '/login';
+    }
+  }, [isAuthenticated]);
   const fetchServices = async () => {
     try {
       const data = await api.get<Service[]>('services/', false);

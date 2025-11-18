@@ -3,7 +3,7 @@ import { Calendar, Scissors, Star, Clock } from 'lucide-react';
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
-  console.log(isAuthenticated);
+
 
 
   return (

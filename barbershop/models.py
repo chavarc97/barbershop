@@ -59,11 +59,13 @@ class Appointment(models.Model):
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     active = models.BooleanField(default=True)
-    service = models.ForeignKey(Service, on_delete=models.PROTECT, related_name="appointments")
+    # Make service nullable for smoother migrations when adding this field to existing DBs.
+    # After the column exists and rows are backfilled, you can make this non-nullable.
+    service = models.ForeignKey(Service, on_delete=models.PROTECT, related_name="appointments", null=True, blank=True)
 
 
     def __str__(self):
-        return f"Appt #{self.id} {self.status} - {self.appointment_datetime}"
+        return f"Appt #{self.pk} {self.status} - {self.appointment_datetime}"
 
 
 class Rating(models.Model):
@@ -76,7 +78,7 @@ class Rating(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Rating {self.score} for appt {self.appointment_id}"
+        return f"Rating {self.score} for appt {self.appointment.pk}"
 
 
 class Payment(models.Model):

@@ -1,29 +1,39 @@
-import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
-import type { Service, UserProfile, AvailabilityCheck } from '../../types';
-import { Check, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { api } from "../../lib/api";
+import type { Service, UserProfile, AvailabilityCheck } from "../../types";
+import { Check, AlertCircle } from "lucide-react";
+import { useAuth } from '../../context/AuthContext';
+
 
 export default function BookAppointment() {
   const [services, setServices] = useState<Service[]>([]);
   const [barbers, setBarbers] = useState<UserProfile[]>([]);
   const [selectedService, setSelectedService] = useState<number | null>(null);
   const [selectedBarber, setSelectedBarber] = useState<number | null>(null);
-  const [appointmentDate, setAppointmentDate] = useState('');
-  const [appointmentTime, setAppointmentTime] = useState('');
-  const [notes, setNotes] = useState('');
+  const { isAuthenticated, user } = useAuth();
+  const [appointmentDate, setAppointmentDate] = useState("");
+  const [appointmentTime, setAppointmentTime] = useState("");
+  const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [availability, setAvailability] = useState<AvailabilityCheck | null>(null);
-  const [error, setError] = useState('');
+  const [availability, setAvailability] = useState<AvailabilityCheck | null>(
+    null
+  );
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      // Redirect to login page
+      window.location.href = '/login';
+      return;
+    }
     fetchServices();
     fetchBarbers();
 
     const params = new URLSearchParams(window.location.search);
-    const serviceId = params.get('service');
-    const barberId = params.get('barber');
+    const serviceId = params.get("service");
+    const barberId = params.get("barber");
 
     if (serviceId) setSelectedService(parseInt(serviceId));
     if (barberId) setSelectedBarber(parseInt(barberId));
@@ -31,19 +41,20 @@ export default function BookAppointment() {
 
   const fetchServices = async () => {
     try {
-      const data = await api.get<Service[]>('/services/', false);
+      const data = await api.get<Service[]>("services/", false);
       setServices(data);
     } catch (err) {
-      console.error('Failed to load services', err);
+      console.error("Failed to load services", err);
     }
   };
 
   const fetchBarbers = async () => {
     try {
-      const data = await api.get<UserProfile[]>('/profiles/barbers/');
+      const data = await api.get<UserProfile[]>("profiles/barbers/");
       setBarbers(data);
+      console.log(data);
     } catch (err) {
-      console.error('Failed to load barbers', err);
+      console.error("Failed to load barbers", err);
     }
   };
 
@@ -53,7 +64,7 @@ export default function BookAppointment() {
     }
 
     setChecking(true);
-    setError('');
+    setError("");
     setAvailability(null);
 
     const service = services.find((s) => s.id === selectedService);
@@ -61,15 +72,20 @@ export default function BookAppointment() {
 
     try {
       const datetime = `${appointmentDate}T${appointmentTime}:00`;
-      const result = await api.post<AvailabilityCheck>('/appointments/check_availability/', {
-        barber_id: selectedBarber,
-        appointment_datetime: datetime,
-        duration_minutes: durationMinutes,
-      });
+      const result = await api.post<AvailabilityCheck>(
+        "appointments/check_availability/",
+        {
+          barber_id: selectedBarber,
+          appointment_datetime: datetime,
+          duration_minutes: durationMinutes,
+        }
+      );
 
       setAvailability(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to check availability');
+      setError(
+        err instanceof Error ? err.message : "Failed to check availability"
+      );
     } finally {
       setChecking(false);
     }
@@ -88,19 +104,21 @@ export default function BookAppointment() {
     e.preventDefault();
 
     if (!availability?.available) {
-      setError('Please select an available time slot');
+      setError("Please select an available time slot");
       return;
     }
 
     setLoading(true);
-    setError('');
+    setError("");
 
     const service = services.find((s) => s.id === selectedService);
     const datetime = `${appointmentDate}T${appointmentTime}:00`;
 
     try {
-      await api.post('/appointments/', {
-        barber: selectedBarber,
+      await api.post("appointments/", {
+        barber_id: selectedBarber,
+        service_id: selectedService,
+        client_id: user?.id,
         appointment_datetime: datetime,
         duration_minutes: service?.duration_minutes || 30,
         notes,
@@ -108,10 +126,12 @@ export default function BookAppointment() {
 
       setSuccess(true);
       setTimeout(() => {
-        window.location.href = '/appointments';
+        window.location.href = "/appointments";
       }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to book appointment');
+      setError(
+        err instanceof Error ? err.message : "Failed to book appointment"
+      );
     } finally {
       setLoading(false);
     }
@@ -127,9 +147,15 @@ export default function BookAppointment() {
           <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h2>
-          <p className="text-gray-600 mb-4">Your appointment has been successfully booked.</p>
-          <p className="text-sm text-gray-500">Redirecting to your appointments...</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Booking Confirmed!
+          </h2>
+          <p className="text-gray-600 mb-4">
+            Your appointment has been successfully booked.
+          </p>
+          <p className="text-sm text-gray-500">
+            Redirecting to your appointments...
+          </p>
         </div>
       </div>
     );
@@ -138,17 +164,24 @@ export default function BookAppointment() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="bg-white rounded-xl shadow-md p-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Book an Appointment</h1>
-        <p className="text-gray-600">Fill in the details below to schedule your visit</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Book an Appointment
+        </h1>
+        <p className="text-gray-600">
+          Fill in the details below to schedule your visit
+        </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-6 space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded-xl shadow-md p-6 space-y-6"
+      >
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Select Service *
           </label>
           <select
-            value={selectedService || ''}
+            value={selectedService || ""}
             onChange={(e) => setSelectedService(parseInt(e.target.value))}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
@@ -156,7 +189,8 @@ export default function BookAppointment() {
             <option value="">Choose a service</option>
             {services.map((service) => (
               <option key={service.id} value={service.id}>
-                {service.name} - ${service.price} ({service.duration_minutes} mins)
+                {service.name} - ${service.price} ({service.duration_minutes}{" "}
+                mins)
               </option>
             ))}
           </select>
@@ -167,7 +201,7 @@ export default function BookAppointment() {
             Select Barber *
           </label>
           <select
-            value={selectedBarber || ''}
+            value={selectedBarber || ""}
             onChange={(e) => setSelectedBarber(parseInt(e.target.value))}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             required
@@ -178,7 +212,8 @@ export default function BookAppointment() {
                 {barber.user.first_name && barber.user.last_name
                   ? `${barber.user.first_name} ${barber.user.last_name}`
                   : barber.user.username}
-                {barber.average_rating && ` (${barber.average_rating.toFixed(1)} ★)`}
+                {barber.average_rating &&
+                  ` (${barber.average_rating.toFixed(1)} ★)`}
               </option>
             ))}
           </select>
@@ -186,19 +221,23 @@ export default function BookAppointment() {
 
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Date *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Date *
+            </label>
             <input
               type="date"
               value={appointmentDate}
               onChange={(e) => setAppointmentDate(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
+              min={new Date().toISOString().split("T")[0]}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Time *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Time *
+            </label>
             <input
               type="time"
               value={appointmentTime}
@@ -220,23 +259,29 @@ export default function BookAppointment() {
           <div
             className={`flex items-start space-x-3 p-4 rounded-lg ${
               availability.available
-                ? 'bg-green-50 border border-green-200'
-                : 'bg-red-50 border border-red-200'
+                ? "bg-green-50 border border-green-200"
+                : "bg-red-50 border border-red-200"
             }`}
           >
             {availability.available ? (
               <>
                 <Check className="w-5 h-5 text-green-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-green-900">Time slot available!</p>
-                  <p className="text-sm text-green-700">You can proceed with booking</p>
+                  <p className="font-medium text-green-900">
+                    Time slot available!
+                  </p>
+                  <p className="text-sm text-green-700">
+                    You can proceed with booking
+                  </p>
                 </div>
               </>
             ) : (
               <>
                 <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-red-900">Time slot not available</p>
+                  <p className="font-medium text-red-900">
+                    Time slot not available
+                  </p>
                   <p className="text-sm text-red-700">{availability.reason}</p>
                 </div>
               </>
@@ -265,15 +310,18 @@ export default function BookAppointment() {
 
         {selectedServiceData && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">Booking Summary</h3>
+            <h3 className="font-semibold text-blue-900 mb-2">
+              Booking Summary
+            </h3>
             <div className="space-y-1 text-sm text-blue-800">
               <p>Service: {selectedServiceData.name}</p>
               <p>Duration: {selectedServiceData.duration_minutes} minutes</p>
               <p>Price: ${selectedServiceData.price}</p>
               {selectedBarberData && (
                 <p>
-                  Barber:{' '}
-                  {selectedBarberData.user.first_name && selectedBarberData.user.last_name
+                  Barber:{" "}
+                  {selectedBarberData.user.first_name &&
+                  selectedBarberData.user.last_name
                     ? `${selectedBarberData.user.first_name} ${selectedBarberData.user.last_name}`
                     : selectedBarberData.user.username}
                 </p>
@@ -292,7 +340,7 @@ export default function BookAppointment() {
           disabled={loading || !availability?.available || checking}
           className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {loading ? 'Booking...' : 'Confirm Booking'}
+          {loading ? "Booking..." : "Confirm Booking"}
         </button>
       </form>
     </div>
