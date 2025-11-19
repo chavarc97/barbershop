@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Barber Dashboard</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: #f4f6f9;
+            color: #2a2d34;
+            margin: 0;
+            padding: 0;
+        }
+
+        .navbar {
+            background-color: #0d6efd;
+            padding: 15px 30px;
+            color: white;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .container {
+            padding: 30px;
+        }
+
+        .dashboard-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #0d6efd;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 18px rgba(0,0,0,0.1);
+        }
+
+        .card-title {
+            font-size: 16px;
+            color: #6c757d;
+        }
+
+        .card-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0d6efd;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 30px;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        th, td {
+            padding: 14px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #0d6efd;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #eef3ff;
+        }
+
+        tr:hover {
+            background-color: #d7e3ff;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 15px;
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="navbar">
+        Barber Dashboard
+    </div>
+
+    <div class="container">
+        <h1 class="dashboard-title">My Performance Overview</h1>
+
+        <div class="stats-grid" id="stats-cards"></div>
+
+        <h2 style="margin-top: 40px; color: #0d6efd;">Appointments Summary (Chart)</h2>
+
+        <div style="width: 60%; margin-bottom: 50px;">
+            <canvas id="statsChart"></canvas>
+        </div>
+
+        <h2 style="margin-top: 40px; color: #0d6efd;">Top Services</h2>
+        <table id="services-table">
+            <tr>
+                <th>Service</th>
+                <th>Total</th>
+            </tr>
+        </table>
+
+        <div class="footer">
+            Barbershop System — 2025
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem("access_token");
+
+        if (!token) {
+            document.getElementById("stats-cards").innerHTML = 
+                "<p style='color:red;'>No active session. Please log in.</p>";
+        } 
+        else 
+        {
+            //      LOAD OVERVIEW STATS
+            fetch("http://localhost:8500/api/stats-json/", {
+                method: "GET",
+                headers: {
+                    "Authorization": "Bearer " + token
+                }
+            })
+            .then(r => r.json())
+            .then(data => {
+
+                // ---- CARDS ----
+                const statsHTML = `
+                    <div class="card">
+                        <div class="card-title">Total Completed</div>
+                        <div class="card-value">${data.total_completed}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Total Booked</div>
+                        <div class="card-value">${data.total_booked}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Total Canceled</div>
+                        <div class="card-value">${data.total_canceled}</div>
+                    </div>
+                `;
+                document.getElementById("stats-cards").innerHTML = statsHTML;
+
+                // ---- CHART ----
+                const ctx = document.getElementById('statsChart').getContext('2d');
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Completed', 'Booked', 'Canceled'],
+                        datasets: [{
+                            label: 'Appointments',
+                            data: [
+                                data.total_completed,
+                                data.total_booked,
+                                data.total_canceled
+                            ],
+                            backgroundColor: [
+                                'rgba(13, 110, 253, 0.8)',
+                                'rgba(0, 200, 83, 0.8)',
+                                'rgba(220, 53, 69, 0.8)'
+                            ],
+                            borderRadius: 8,
+                            borderSkipped: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false }},
+                        scales: {
+                            y: { beginAtZero: true, ticks: { stepSize: 1 }}
+                        }
+                    }
+                });
+            });
+
+            //      LOAD TOP SERVICES
+            fetch("http://localhost:8500/api/top-services/", {
+                method: "GET",
+                headers: {
+                    "Authorization": "Bearer " + token
+                }
+            })
+            .then(r => r.json())
+            .then(services => {
+
+                let tableHTML = `
+                    <tr>
+                        <th>Service</th>
+                        <th>Total</th>
+                    </tr>
+                `;
+
+                if (services.length === 0) {
+                    tableHTML += `
+                        <tr>
+                            <td colspan="2" style="text-align:center; padding:20px;">
+                                No service data available yet.
+                            </td>
+                        </tr>
+                    `;
+                } 
+                else {
+                    services.forEach(s => {
+                        tableHTML += `
+                            <tr>
+                                <td>${s.service__name}</td>
+                                <td>${s.total}</td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                document.getElementById("services-table").innerHTML = tableHTML;
+
+            })
+            .catch(err => console.error(err));
+        }
+    </script>
+
+</body>
+</html>

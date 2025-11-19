@@ -10,7 +10,10 @@ from .views import (
     CalendarEventViewSet,
     LoginAPIView,
     GoogleLoginAPIView,
-    RegisterAPIView
+    RegisterAPIView,
+    barber_stats_view,
+    barber_stats_json,
+    barber_top_services_json
 )
 
 
@@ -30,10 +33,13 @@ router.register(r'calendar-events', CalendarEventViewSet, basename='calendareven
 
 # The API URLs are now determined automatically by the router
 urlpatterns = [
+    path('barber/stats/', barber_stats_view, name='barber-stats'),
+    path('stats-json/', barber_stats_json, name='barber-stats-json'),
+    path('top-services/', barber_top_services_json, name='barber-top-services-json'),
+
     path('', include(router.urls)),
     path('login/', LoginAPIView.as_view(), name='login'),
     path('google/', GoogleLoginAPIView.as_view(), name='google-login'),
     path('register/', RegisterAPIView.as_view(), name='register'),
-
-
+    path('barber/stats/', barber_stats_view, name='barber-stats'),
 ]

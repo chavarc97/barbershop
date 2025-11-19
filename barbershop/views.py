@@ -13,7 +13,14 @@ from google.auth.transport import requests
 from google.oauth2 import id_token
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from django.shortcuts import render
+from .permissions import IsBarberOrAdmin
+from django.contrib.auth.decorators import login_required, user_passes_test
 from googleapiclient.errors import HttpError
+from django.http import HttpResponse
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from .models import (
     UserProfile, Service, BarberSchedule,
     Appointment, Rating, Payment, CalendarEvent
@@ -1124,3 +1131,61 @@ class RegisterAPIView(APIView):
             },
             "message": f"User registered successfully as {role}"
         }, status=status.HTTP_201_CREATED)
+
+def barber_stats_view(request):
+    return render(request, "barber/stats.html")
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def barber_stats_json(request):
+    """
+    Returns general performance statistics for the authenticated barber.
+    - The user must be authenticated via JWT.
+    - The user must have a profile with role = 'barber'.
+    """
+
+    user = request.user
+
+    # Ensure the user has a profile and is a barber
+    if not hasattr(user, 'profile') or user.profile.role != "barber":
+        return Response({"error": "Forbidden"}, status=403)
+
+    # Retrieve only active appointments
+    appointments = Appointment.objects.filter(barber=user, active=True)
+
+    # Build statistics dictionary
+    stats = {
+        "total_completed": appointments.filter(status="completed").count(),
+        "total_canceled": appointments.filter(status="canceled").count(),
+        "total_booked": appointments.filter(status="booked").count(),
+    }
+
+    # Return as JSON response
+    return Response(stats)
+
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def barber_top_services_json(request):
+    """
+    Returns a list of the most requested services for the authenticated barber.
+    - The user must be authenticated via JWT.
+    - The user must have a profile with role = 'barber'.
+    """
+
+    user = request.user
+
+    # Ensure the user has a profile and is a barber
+    if not hasattr(user, 'profile') or user.profile.role != "barber":
+        return Response({"error": "Forbidden"}, status=403)
+
+    # Group appointments by service and count their occurrences
+    qs = (
+        Appointment.objects.filter(barber=user, active=True)
+        .values("service__name")
+        .annotate(total=Count("id"))
+        .order_by("-total")  
+    )
+    return Response(list(qs))
