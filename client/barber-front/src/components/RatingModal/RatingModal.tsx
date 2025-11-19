@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import type { Appointment } from '../../types';
 import { Star, X } from 'lucide-react';
@@ -15,6 +15,7 @@ export default function RatingModal({ appointment, onClose, onSuccess }: RatingM
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [alreadyRated, setAlreadyRated] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,12 +25,18 @@ export default function RatingModal({ appointment, onClose, onSuccess }: RatingM
       return;
     }
 
+    if (alreadyRated) {
+      setError('You have already rated this appointment');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
       await api.post('/ratings/', {
         appointment: appointment.id,
+        appointment_id: appointment.id,
         score: rating,
         comment,
       });
@@ -41,6 +48,25 @@ export default function RatingModal({ appointment, onClose, onSuccess }: RatingM
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+    const checkIfRated = async () => {
+      try {
+        const myRatings = await api.get('/ratings/my_ratings/');
+        if (!mounted) return;
+        const found = Array.isArray(myRatings) && myRatings.some((r: any) => r.appointment === appointment.id || r.appointment_id === appointment.id);
+        setAlreadyRated(!!found);
+      } catch (err) {
+        // ignore errors silently
+      }
+    };
+
+    checkIfRated();
+    return () => {
+      mounted = false;
+    };
+  }, [appointment.id]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

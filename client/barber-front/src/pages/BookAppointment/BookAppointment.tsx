@@ -31,6 +31,8 @@ export default function BookAppointment() {
     fetchServices();
     fetchBarbers();
 
+    console.log(user?.user.id);
+
     const params = new URLSearchParams(window.location.search);
     const serviceId = params.get("service");
     const barberId = params.get("barber");
@@ -52,7 +54,6 @@ export default function BookAppointment() {
     try {
       const data = await api.get<UserProfile[]>("profiles/barbers/");
       setBarbers(data);
-      console.log(data);
     } catch (err) {
       console.error("Failed to load barbers", err);
     }
@@ -118,7 +119,7 @@ export default function BookAppointment() {
       await api.post("appointments/", {
         barber_id: selectedBarber,
         service_id: selectedService,
-        client_id: user?.id,
+        client_id: user?.user.id,
         appointment_datetime: datetime,
         duration_minutes: service?.duration_minutes || 30,
         notes,

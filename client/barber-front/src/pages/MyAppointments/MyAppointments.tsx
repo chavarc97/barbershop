@@ -14,6 +14,7 @@ export default function MyAppointments() {
   const [selectedForRating, setSelectedForRating] = useState<Appointment | null>(null);
   const [selectedForReschedule, setSelectedForReschedule] = useState<Appointment | null>(null);
   const [error, setError] = useState('');
+  const [ratedAppointments, setRatedAppointments] = useState<Set<number>>(new Set());
   const { isAuthenticated } = useAuth();
 
   useEffect(() => {
@@ -23,8 +24,8 @@ export default function MyAppointments() {
       setUpcomingAppointments([]);
       setPastAppointments([]);
       fetchAppointments();
-      console.log(upcomingAppointments);
-      console.log(pastAppointments);
+      fetchMyRatings();
+      
       return;
     } else {
       setLoading(false);
@@ -51,6 +52,23 @@ export default function MyAppointments() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMyRatings = async () => {
+    try {
+      const myRatings = await api.get<any[]>('/ratings/my_ratings/');
+      const ids = new Set<number>();
+      if (Array.isArray(myRatings)) {
+        myRatings.forEach((r) => {
+          const appt = r.appointment ?? r.appointment_id ?? (r.appointment && (r.appointment.id ?? r.appointment));
+          if (typeof appt === 'number') ids.add(appt);
+          else if (appt && typeof appt === 'object' && typeof appt.id === 'number') ids.add(appt.id);
+        });
+      }
+      setRatedAppointments(ids);
+    } catch (err) {
+      console.error('Failed to fetch my ratings', err);
     }
   };
 
@@ -178,15 +196,19 @@ export default function MyAppointments() {
           </div>
         )}
 
-        {appointment.status === 'completed' && (
-          <button
-            onClick={() => setSelectedForRating(appointment)}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-2 mt-4 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition"
-          >
-            <Star className="w-4 h-4" />
-            <span>Rate Service</span>
-          </button>
-        )}
+        {appointment.status === 'completed' && (() => {
+          const isRated = ratedAppointments.has(appointment.id);
+          return (
+            <button
+              onClick={() => !isRated && setSelectedForRating(appointment)}
+              disabled={isRated}
+              className={`w-full flex items-center justify-center space-x-2 px-4 py-2 mt-4 rounded-lg transition ${isRated ? 'bg-gray-200 text-gray-600 cursor-not-allowed' : 'bg-yellow-500 text-white hover:bg-yellow-600'}`}
+            >
+              <Star className="w-4 h-4" />
+              <span>{isRated ? 'Already Rated' : 'Rate Service'}</span>
+            </button>
+          );
+        })()}
       </div>
     );
   };
@@ -276,6 +298,7 @@ export default function MyAppointments() {
           onSuccess={() => {
             setSelectedForRating(null);
             fetchAppointments();
+            fetchMyRatings();
           }}
         />
       )}
