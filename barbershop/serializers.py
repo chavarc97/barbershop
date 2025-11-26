@@ -93,7 +93,7 @@ class AppointmentListSerializer(serializers.ModelSerializer):
             'appointment_datetime', 'duration_minutes', 'status',
             'created_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'client','created_at']
 
 
 class AppointmentDetailSerializer(serializers.ModelSerializer):
@@ -101,12 +101,21 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
     client = UserSerializer(read_only=True)
     barber = UserSerializer(read_only=True)
     service = ServiceSerializer(read_only=True)
-    service_id = serializers.PrimaryKeyRelatedField(queryset=Service.objects.filter(active=True), source='service', write_only=True)
+    
+    service_id = serializers.PrimaryKeyRelatedField(
+        queryset=Service.objects.filter(active=True), 
+        source='service', 
+        write_only=True
+    )
+    
+    # Make client_id optional since it's auto-set in perform_create for non-admin users
     client_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), 
         source='client', 
-        write_only=True
+        write_only=True,
+        required=False  # 👈 ADD THIS
     )
+    
     barber_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(), 
         source='barber', 
@@ -130,7 +139,7 @@ class AppointmentDetailSerializer(serializers.ModelSerializer):
         if barber and (not hasattr(barber, 'profile') or barber.profile.role != UserProfile.Roles.BARBER):
             raise serializers.ValidationError("Selected user is not a barber")
         
-        # Check if client has client role
+        # Check if client has client role (only if client was provided)
         client = attrs.get('client')
         if client and hasattr(client, 'profile') and client.profile.role == UserProfile.Roles.BARBER:
             raise serializers.ValidationError("Barbers cannot book appointments as clients")

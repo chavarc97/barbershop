@@ -28,7 +28,8 @@ SECRET_KEY = 'django-insecure-*_l4n9*jzt%_%48k-&93=8uagtrvzx4!w#5$dc=2&c5spjp!(a
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else ['*']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(
+    ',') if os.getenv('ALLOWED_HOSTS') else ['*']
 
 
 # Application definition
@@ -47,7 +48,7 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_yasg',  # for API documentation
     'corsheaders',
-    
+
     # my apps
     'barbershop.apps.BarbershopConfig',
 ]
@@ -107,11 +108,12 @@ else:
             'PORT': os.getenv('DATABASE_PORT', '5432'),
         }
     }
-    
+
     # Railway provides DATABASE_URL, parse it if available
     if 'DATABASE_URL' in os.environ:
         import dj_database_url
-        DATABASES['default'] = dj_database_url.config(conn_max_age=600, conn_health_checks=True)
+        DATABASES['default'] = dj_database_url.config(
+            conn_max_age=600, conn_health_checks=True)
 
 
 # Password validation
@@ -175,9 +177,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',  # JWT auth for Bearer tokens
-        'rest_framework.authentication.SessionAuthentication',        # Session auth for browsable API
-        'rest_framework.authentication.TokenAuthentication',          # DRF Token auth (optional)
+        # JWT auth for Bearer tokens
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # Session auth for browsable API
+        'rest_framework.authentication.SessionAuthentication',
+        # DRF Token auth (optional)
+        'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -265,10 +270,13 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # Email configuration
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND')
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'  # Default for development
+)
 EMAIL_HOST = os.getenv('EMAIL_HOST')
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = EMAIL_BACKEND
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
