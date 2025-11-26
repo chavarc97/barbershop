@@ -41,5 +41,4 @@ urlpatterns = [
     path('login/', LoginAPIView.as_view(), name='login'),
     path('google/', GoogleLoginAPIView.as_view(), name='google-login'),
     path('register/', RegisterAPIView.as_view(), name='register'),
-    path('barber/stats/', barber_stats_view, name='barber-stats'),
 ]
