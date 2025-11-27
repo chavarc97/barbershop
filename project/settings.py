@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 from datetime import timedelta
 import os
+import dj_database_url  # Added for Railway / DATABASE_URL support
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,12 +21,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-*_l4n9*jzt%_%48k-&93=8uagtrvzx4!w#5$dc=2&c5spjp!(a'
 
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(
@@ -46,7 +44,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'django_filters',
-    'drf_yasg',  # for API documentation
+    'drf_yasg',
     'corsheaders',
 
     # my apps
@@ -55,7 +53,7 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Must be before CommonMiddleware
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -85,11 +83,10 @@ TEMPLATES = [
 WSGI_APPLICATION = 'project.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# ==============================================================
+# DATABASE — FIXED FOR RAILWAY USING ONLY DATABASE_URL
+# ==============================================================
 
-# Database configuration - use environment variables for production
-# For testing during Docker build, use SQLite if TEST_DATABASE_ENGINE is set
 if os.getenv('TEST_DATABASE_ENGINE'):
     DATABASES = {
         'default': {
@@ -99,89 +96,58 @@ if os.getenv('TEST_DATABASE_ENGINE'):
     }
 else:
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('DATABASE_NAME', 'mydatabase'),
-            'USER': os.getenv('DATABASE_USER', 'user'),
-            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'password'),
-            'HOST': os.getenv('DATABASE_HOST', 'db'),
-            'PORT': os.getenv('DATABASE_PORT', '5432'),
-        }
+        'default': dj_database_url.config(
+            default=os.getenv("DATABASE_URL"),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-
-    # Railway provides DATABASE_URL, parse it if available
-    if 'DATABASE_URL' in os.environ:
-        import dj_database_url
-        DATABASES['default'] = dj_database_url.config(
-            conn_max_age=600, conn_health_checks=True)
 
 
 # Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
+# Static files
 
 STATIC_URL = 'static/'
 
-# Use Railway volume for static files if VOLUME_PATH is set, otherwise use local directory
 VOLUME_PATH = os.getenv('VOLUME_PATH', '')
+
 if VOLUME_PATH:
-    # Railway volume mounted at /staticfiles
     STATIC_ROOT = Path(VOLUME_PATH) / 'static'
     MEDIA_ROOT = Path(VOLUME_PATH) / 'media'
 else:
-    # Local development
     STATIC_ROOT = BASE_DIR / 'staticfiles'
     MEDIA_ROOT = BASE_DIR / 'media'
 
-# WhiteNoise configuration for static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Media files (User uploaded files)
 MEDIA_URL = '/media/'
 
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
+# REST Framework + JWT
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # JWT auth for Bearer tokens
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        # Session auth for browsable API
         'rest_framework.authentication.SessionAuthentication',
-        # DRF Token auth (optional)
         'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -196,7 +162,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-# JWT settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
@@ -206,73 +171,58 @@ SIMPLE_JWT = {
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
 }
 
-# Swagger settings (drf-yasg)
+
+# Swagger
+
 SWAGGER_SETTINGS = {
     'SECURITY_DEFINITIONS': {
-        'basic': {
-            'type': 'basic'
-        },
+        'basic': {'type': 'basic'},
         'api_key': {
             'type': 'apiKey',
             'in': 'header',
             'name': 'Authorization',
-            'description': 'Token-based authentication. Example: "Token 9944b09199c62bcf9418ad846dd0e4bbdfc6ee4b"'
-        }
+            'description': 'Token-based auth. Example: "Bearer <token>"',
+        },
     },
     'USE_SESSION_AUTH': True,
     'JSON_EDITOR': True,
-    'SUPPORTED_SUBMIT_METHODS': [
-        'get',
-        'post',
-        'put',
-        'delete',
-        'patch'
-    ],
+    'SUPPORTED_SUBMIT_METHODS': ['get','post','put','delete','patch'],
     'OPERATIONS_SORTER': 'alpha',
     'TAGS_SORTER': 'alpha',
     'DOC_EXPANSION': 'list',
-    'DEEP_LINKING': True,
-    'SHOW_REQUEST_HEADERS': True,
-    'SHOW_EXTENSIONS': True,
-    'SHOW_COMMON_EXTENSIONS': True,
 }
 
-# drf-yasg settings
+
 SWAGGER_SCHEMA_URL = os.getenv('SWAGGER_SCHEMA_URL', 'http://localhost:8500')
 
 LOGIN_REDIRECT_URL = "/"
-
 SITE_ID = 1
 
-# CORS settings
+
+# CORS
+
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite dev server
-    "http://localhost:3000",  # Common React dev port
+    "http://localhost:5173",
+    "http://localhost:3000",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
 ]
 
-# Add production origins from environment variable
 if os.getenv('CORS_ALLOWED_ORIGINS'):
     CORS_ALLOWED_ORIGINS.extend(os.getenv('CORS_ALLOWED_ORIGINS').split(','))
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+    'accept','accept-encoding','authorization','content-type','dnt',
+    'origin','user-agent','x-csrftoken','x-requested-with',
 ]
 
-# Email configuration
+
+# Email
+
 EMAIL_BACKEND = os.getenv(
     'EMAIL_BACKEND',
-    'django.core.mail.backends.console.EmailBackend'  # Default for development
+    'django.core.mail.backends.console.EmailBackend'
 )
 EMAIL_HOST = os.getenv('EMAIL_HOST')
 EMAIL_PORT = 587
