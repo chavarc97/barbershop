@@ -2,12 +2,13 @@ asgiref==3.9.1
 cachetools==6.2.1
 certifi==2025.10.5
 charset-normalizer==3.4.4
+dj-database-url==3.0.1
 Django==5.2.6
+django-allauth==65.12.0
 django-cors-headers==4.3.1
 django-filter==24.2
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
-django-allauth==65.12.0
 drf-yasg==1.21.7
 google-api-core==2.28.1
 google-api-python-client==2.187.0
@@ -32,6 +33,7 @@ Pygments==2.19.2
 PyJWT==2.10.1
 pyparsing==3.2.5
 pytest==8.4.2
+pytest-django==4.11.1
 python-dotenv==1.2.1
 pytz==2025.2
 PyYAML==6.0.3
@@ -42,6 +44,4 @@ setuptools==69.1.0
 sqlparse==0.5.3
 uritemplate==4.2.0
 urllib3==2.5.0
-dj-database-url
 whitenoise==6.6.0
-djangorestframework-simplejwt

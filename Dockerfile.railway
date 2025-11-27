@@ -1,0 +1,38 @@
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt /app/
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+
+# Copy project
+COPY . /app/
+
+# Run tests before building - if tests fail, build fails
+# Use pytest for testing (configured in pytest.ini)
+# Set environment for testing (use SQLite in-memory for tests during build)
+# Note: These env vars are only set for the test run, not persisted
+ENV DJANGO_SETTINGS_MODULE=project.settings
+RUN TEST_DATABASE_ENGINE=django.db.backends.sqlite3 TEST_DATABASE_NAME=:memory: pytest --tb=short -v || (echo "Tests failed! Build aborted." && exit 1)
+
+# Expose port (Railway uses dynamic ports, but we expose a default)
+EXPOSE 8000
+
+# Copy startup script
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
+# Run startup script
+CMD ["/app/start.sh"]
