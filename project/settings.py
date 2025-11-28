@@ -15,11 +15,15 @@ from datetime import timedelta
 import os
 import dj_database_url  # Added for Railway / DATABASE_URL support
 from dotenv import load_dotenv
+load_dotenv()
+
+# GOOGLE ID 
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+        
 # Quick-start development settings - unsuitable for production
 
 SECRET_KEY = 'django-insecure-*_l4n9*jzt%_%48k-&93=8uagtrvzx4!w#5$dc=2&c5spjp!(a'
@@ -93,13 +97,26 @@ if os.getenv('TEST_DATABASE_ENGINE'):
             'NAME': os.getenv('TEST_DATABASE_NAME', ':memory:'),
         }
     }
-else:
+elif os.getenv('DATABASE_URL'):
+    # Use DATABASE_URL if provided (for Railway, Heroku, etc.)
     DATABASES = {
         'default': dj_database_url.config(
             default=os.getenv("DATABASE_URL"),
             conn_max_age=600,
             conn_health_checks=True,
         )
+    }
+else:
+    # Use individual database environment variables
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DATABASE_NAME', 'barber_db'),
+            'USER': os.getenv('DATABASE_USER', 'barber_admin'),
+            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'barber.app.2025'),
+            'HOST': os.getenv('DATABASE_HOST', 'db'),
+            'PORT': os.getenv('DATABASE_PORT', '5432'),
+        }
     }
 
 

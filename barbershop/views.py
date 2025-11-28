@@ -9,16 +9,18 @@ from datetime import datetime, timedelta, time
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+# Google Modules
 from google.auth.transport import requests
 from google.oauth2 import id_token
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+
 from django.shortcuts import render
 from .permissions import IsBarberOrAdmin
 from django.contrib.auth.decorators import login_required, user_passes_test
 from googleapiclient.errors import HttpError
 from django.http import HttpResponse
-
+import os
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -361,7 +363,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         user = self.request.user
         
         # If user is not admin, force them as the client
-        if not (hasattr(user, 'profile') and user.profile.role == UserProfile.Roles.ADMIN):
+        if not (hasattr(user, 'profile') and user.profile.role == UserProfile.Roles.ADMIN): # type: ignore
             serializer.save(client=user)
         else:
             serializer.save()
@@ -456,7 +458,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         # Check if barber exists and has barber role
         try:
             barber = User.objects.get(id=barber_id)
-            if not hasattr(barber, 'profile') or barber.profile.role != UserProfile.Roles.BARBER:
+            if not hasattr(barber, 'profile') or barber.profile.role != UserProfile.Roles.BARBER:  # type: ignore
                 return Response(
                     {"error": "Selected user is not a barber"},
                     status=status.HTTP_400_BAD_REQUEST
@@ -981,12 +983,12 @@ class LoginAPIView(APIView):
             'access': str(refresh.access_token),
             'refresh': str(refresh),
             'user': {
-                'id': user.id,
+                'id': user.id, # type: ignore
                 'username': user.username,
                 'email': user.email,
                 'first_name': user.first_name,
                 'last_name': user.last_name,
-                'role': getattr(user.profile, 'role', None)
+                'role': getattr(user.profile, 'role', None) # type: ignore
             }
         })
 
@@ -994,38 +996,59 @@ class LoginAPIView(APIView):
 class GoogleLoginAPIView(APIView):
     """
     Handle Google OAuth2 login or registration.
-
-    This endpoint verifies a Google ID token, retrieves the user info, 
-    and either logs in an existing user or creates a new one.
-
-    It also allows specifying a role (client or barber) during registration.
-
     """
-
     permission_classes = [AllowAny]
 
     def post(self, request):
         token = request.data.get('id_token')
-        role = request.data.get('role', UserProfile.Roles.CLIENT)  
+        role = request.data.get('role', UserProfile.Roles.CLIENT)
 
         if not token:
-            return Response({'error': 'id_token is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'id_token is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         if role not in [UserProfile.Roles.CLIENT, UserProfile.Roles.BARBER]:
-            return Response({'error': 'Invalid role'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Invalid role'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
-            # Verify token with Google servers
-            idinfo = id_token.verify_oauth2_token(token, requests.Request())
+            # Get Google Client ID from environment
+            GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+            
+            if not GOOGLE_CLIENT_ID:
+                return Response(
+                    {'error': 'Google OAuth not configured'}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            # Verify token with Google
+            idinfo = id_token.verify_oauth2_token(
+                token, 
+                requests.Request(), 
+                GOOGLE_CLIENT_ID
+            )
 
             # Extract user info
             google_id = idinfo['sub']
             email = idinfo.get('email')
             first_name = idinfo.get('given_name', '')
             last_name = idinfo.get('family_name', '')
+            
+            if not email:
+                return Response(
+                    {'error': 'Email not provided by Google'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        except ValueError:
-            return Response({'error': 'Invalid Google token'}, status=status.HTTP_401_UNAUTHORIZED)
+        except ValueError as e:
+            return Response(
+                {'error': f'Invalid Google token: {str(e)}'}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
         # Find or create user by email
         user, created = User.objects.get_or_create(
@@ -1038,27 +1061,27 @@ class GoogleLoginAPIView(APIView):
         )
 
         # Ensure profile exists
-        profile, _ = UserProfile.objects.get_or_create(user=user)
+        profile, profile_created = UserProfile.objects.get_or_create(user=user)
 
         # Link Google ID and assign role if newly created
-        if created:
+        if created or profile_created:
             profile.google_id = google_id
             profile.role = role
             profile.save()
         else:
-            # If user already existed but had no google_id link it
+            # If user already existed but had no google_id, link it
             if not profile.google_id:
                 profile.google_id = google_id
                 profile.save()
 
-        # Generate JWT
+        # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
 
         return Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
             'user': {
-                'id': user.id,
+                'id': user.id,  # type: ignore
                 'username': user.username,
                 'email': user.email,
                 'first_name': user.first_name,
@@ -1066,7 +1089,7 @@ class GoogleLoginAPIView(APIView):
                 'role': profile.role,
             },
             'created': created
-        })
+        }, status=status.HTTP_200_OK)
     
 
 class RegisterAPIView(APIView):
@@ -1123,7 +1146,7 @@ class RegisterAPIView(APIView):
             "access": str(refresh.access_token),
             "refresh": str(refresh),
             "user": {
-                "id": user.id,
+                "id": user.id, # type: ignore
                 "username": user.username,
                 "email": user.email,
                 "first_name": user.first_name,
