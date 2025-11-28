@@ -53,8 +53,9 @@ INSTALLED_APPS = [
 
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -83,9 +84,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'project.wsgi.application'
 
 
-# ==============================================================
-# DATABASE — FIXED FOR RAILWAY USING ONLY DATABASE_URL
-# ==============================================================
+
 
 if os.getenv('TEST_DATABASE_ENGINE'):
     DATABASES = {
@@ -123,7 +122,7 @@ USE_TZ = True
 
 # Static files
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 VOLUME_PATH = os.getenv('VOLUME_PATH', '')
 
